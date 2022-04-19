@@ -1,0 +1,1 @@
+echo "# stitcher" >> README.md

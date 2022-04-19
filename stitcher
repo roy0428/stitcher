@@ -1,0 +1,64 @@
+import os
+import sys
+import cv2
+import imutils
+import numpy as np
+
+def imgstitcher(imgs):  
+    stitcher = cv2.Stitcher.create(cv2.Stitcher_PANORAMA)
+    stitcher.setRegistrationResol(0.99)
+    stitcher.setSeamEstimationResol(0.5)
+    _result, pano = stitcher.stitch(imgs)
+    pano1 = cv2.copyMakeBorder(pano, 10, 10, 10, 10, cv2.BORDER_CONSTANT, (0, 0, 0))
+    gray = cv2.cvtColor(pano1, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)[1]
+    
+    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    c = max(cnts, key=cv2.contourArea)
+    mask = np.zeros(thresh.shape, dtype="uint8")
+    (x, y, w, h) = cv2.boundingRect(c)
+    cv2.rectangle(mask, (x, y), (x + w, y + h), 255, -1)
+    
+    kernel = np.ones((5,5),np.uint8)
+    minRect = mask.copy()
+    sub = mask.copy()
+    while cv2.countNonZero(sub) > 0:
+        minRect = cv2.erode(minRect, kernel, iterations = 1)
+        sub = cv2.subtract(minRect, thresh)
+        
+    cnts = cv2.findContours(minRect.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    c = max(cnts, key=cv2.contourArea)
+    (x, y, w, h) = cv2.boundingRect(c)
+    pano1 = pano1[y:y + h, x:x + w]
+
+    if _result != cv2.Stitcher_OK:
+        print("不能拼接圖片, error code = %d" % _result)
+        sys.exit(-1)
+
+    output = 'result' + '.jpg'
+    cv2.imwrite(output, pano)
+    output = 'result_cut' + '.jpg'
+    cv2.imwrite(output, pano1)
+    print("拼接成功. %s 已保存!" % output)
+
+if __name__ == "__main__":
+    #imgPath = 'D:/research/images216-1-1'
+    #imgPath = 'D:/research/result_cut2'
+    imgPath = 'D:/research/test'
+    
+    imgList = os.listdir(imgPath)
+    imgs = []
+    for imgName in imgList:
+        pathImg = os.path.join(imgPath, imgName)
+        img = cv2.imread(pathImg)
+        if img is None:
+            print("圖片不能讀取：" + imgName)
+            sys.exit(-1)
+        imgs.append(img)
+
+    imgstitcher(imgs) 
+    
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
